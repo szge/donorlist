@@ -1,6 +1,8 @@
+import bs4
 from bs4 import BeautifulSoup
 import requests
 import time
+import os
 
 
 def get_donor_list() -> None:
@@ -53,5 +55,52 @@ def create_donor_profile(page_url: str) -> bool:
     return True
 
 
+def contact_element(tag: bs4.Tag) -> bool:
+    """check if the tag is a contact element"""
+    return "contact" in tag.text.lower()
+
+
+def create_contact_list() -> None:
+    """create contact.md from people/"""
+    # clear contact.md
+    with open("contact.md", "w", encoding="utf-8") as contact_file:
+        contact_file.write("# Contact List\n\n")  # Initialize with a title
+
+    for donor in os.listdir("people"):
+        if donor.endswith(".md"):
+            with open("people/" + donor, "r", encoding="utf-8") as donor_file:
+                donor_html = donor_file.read()
+                soup = BeautifulSoup(donor_html, "html.parser")
+                post = soup.find("div", class_="post")
+                donor_name = post.find("h1", class_="entry-title").text
+
+                # Assuming the contact element is defined by the text 'CONTACT:'
+                contact_element = soup.find("strong", string='CONTACT:')
+
+                # If contact element exists
+                if contact_element:
+                    # Get the position of the end of the contact element in the raw HTML
+                    end_pos = donor_html.find(str(contact_element)) + len(str(contact_element))
+
+                    # Extract everything after the contact element
+                    content_after_contact = donor_html[end_pos:]
+
+                    # make sure content_after_contact is valid html
+                    # content_after_contact = BeautifulSoup(content_after_contact, "html.parser").prettify()
+                    content_after_contact = BeautifulSoup(content_after_contact, "html.parser").decode()
+
+                    # remove everything after and including <!--POST FOOTER-->
+                    post_footer = content_after_contact.find("<!--POST FOOTER-->")
+                    if post_footer != -1:
+                        content_after_contact = content_after_contact[:post_footer]
+
+                    # Append the donor's name and content to the contact.md
+                    with open('contact.md', 'a', encoding='utf-8') as contact_file:
+                        contact_file.write(f"\n### {donor_name}\n\n")
+                        contact_file.write(content_after_contact)
+                        contact_file.write('\n')
+
+
 if __name__ == "__main__":
-    get_donor_list()
+    # get_donor_list()
+    create_contact_list()
